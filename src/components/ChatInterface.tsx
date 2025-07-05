@@ -13,8 +13,12 @@ import {
   TrendingUp,
   Calculator,
   PiggyBank,
-  Target
+  Target,
+  Brain,
+  Zap,
+  AlertCircle
 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface Message {
   id: string;
@@ -51,7 +55,7 @@ export const ChatInterface = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Hello! I'm your AI financial advisor. I have access to your complete financial profile through Fi's MCP Server. Ask me anything about your finances - from investment performance to future planning!",
+      text: "Hello! I'm your Google Gemini-powered AI financial advisor. I have access to your complete financial profile through Fi's MCP Server. Ask me anything about your finances - from investment performance to future planning!",
       sender: 'ai',
       timestamp: new Date(),
       type: 'insight'
@@ -59,21 +63,69 @@ export const ChatInterface = () => {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [geminiKey, setGeminiKey] = useState('');
+  const [showKeyInput, setShowKeyInput] = useState(!localStorage.getItem('gemini_api_key'));
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
-  const simulateAIResponse = (userMessage: string): string => {
-    const lowerMessage = userMessage.toLowerCase();
+  const callGeminiAPI = async (message: string): Promise<string> => {
+    const apiKey = geminiKey || localStorage.getItem('gemini_api_key');
     
-    if (lowerMessage.includes('net worth')) {
-      return "Based on your current financial data, your net worth has grown by 12.8% this month to ₹11.5L. This growth is primarily driven by your equity investments (+18.3%) and increased savings. Your net worth trajectory suggests you're on track to reach ₹15L by year-end.";
-    } else if (lowerMessage.includes('40') && lowerMessage.includes('money')) {
-      return "Projecting to age 40 based on your current financial profile: With a 32% savings rate and 18.3% average returns, you're projected to have approximately ₹45-52L by age 40. This assumes continued employment, current investment strategy, and inflation-adjusted calculations.";
-    } else if (lowerMessage.includes('home loan') || lowerMessage.includes('50l')) {
-      return "Based on your ₹85K monthly income and current debt-to-income ratio of 18%, you can comfortably afford a ₹50L home loan. Your EMI would be around ₹42K (tenure: 20 years), bringing your total debt-to-income to 68% - within acceptable limits for your risk profile.";
-    } else if (lowerMessage.includes('sip') && lowerMessage.includes('underperformed')) {
-      return "Analyzing your SIP performance: Your Large Cap SIP has underperformed the Nifty 50 by 2.3% this year (12.1% vs 14.4%). However, your Mid Cap and Small Cap SIPs are outperforming their benchmarks by 3.2% and 5.1% respectively. Consider rebalancing or switching the underperforming fund.";
-    } else {
-      return "I've analyzed your question using your financial data from Fi's MCP Server. Let me provide you with personalized insights based on your specific situation. Could you provide more details about what specific aspect you'd like me to focus on?";
+    if (!apiKey) {
+      throw new Error('Gemini API key not provided');
+    }
+
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `You are a professional financial advisor with access to the user's complete financial data through Fi Money's MCP Server. The user has the following financial profile:
+              
+              Net Worth: ₹11.5L (growing at 12.8% monthly)
+              Monthly Income: ₹85K
+              Savings Rate: 32%
+              Investment Returns: 18.3% average
+              Debt-to-Income Ratio: 18%
+              Age: Early 30s
+              
+              Current Holdings:
+              - Equity Funds: ₹4.2L (52% of portfolio, +18.3% growth)
+              - Debt Funds: ₹2.1L (26% of portfolio, +3.2% growth)
+              - Direct Stocks: ₹1.3L (16% of portfolio, -2.1% growth)
+              - Gold/Others: ₹0.5L (6% of portfolio, +1.8% growth)
+              
+              Recent Performance:
+              - Large Cap SIP underperforming Nifty 50 by 2.3%
+              - Mid Cap and Small Cap SIPs outperforming by 3.2% and 5.1%
+              
+              User Question: "${message}"
+              
+              Provide a detailed, personalized response based on this financial data. Include specific numbers, actionable advice, and mention relevant financial concepts. Keep the tone professional but friendly.`
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 1024,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.candidates[0]?.content?.parts[0]?.text || "I apologize, but I couldn't generate a response at the moment.";
+    } catch (error) {
+      console.error('Gemini API Error:', error);
+      throw error;
     }
   };
 
@@ -91,19 +143,48 @@ export const ChatInterface = () => {
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate AI processing delay
-    setTimeout(() => {
-      const aiResponse: Message = {
+    try {
+      const aiResponse = await callGeminiAPI(inputValue);
+      
+      const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: simulateAIResponse(inputValue),
+        text: aiResponse,
         sender: 'ai',
         timestamp: new Date(),
         type: 'insight'
       };
       
-      setMessages(prev => [...prev, aiResponse]);
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: "I apologize, but I'm having trouble connecting to Google Gemini right now. Please check your API key and try again.",
+        sender: 'ai',
+        timestamp: new Date(),
+        type: 'insight'
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+      
+      toast({
+        title: "Connection Error",
+        description: "Failed to connect to Google Gemini API. Please check your API key.",
+        variant: "destructive"
+      });
+    } finally {
       setIsTyping(false);
-    }, 2000);
+    }
+  };
+
+  const handleSaveApiKey = () => {
+    if (geminiKey.trim()) {
+      localStorage.setItem('gemini_api_key', geminiKey);
+      setShowKeyInput(false);
+      toast({
+        title: "API Key Saved",
+        description: "Google Gemini API key has been saved securely in your browser.",
+      });
+    }
   };
 
   const handleSuggestedQuestion = (question: string) => {
@@ -116,13 +197,53 @@ export const ChatInterface = () => {
     }
   }, [messages]);
 
+  if (showKeyInput) {
+    return (
+      <Card className="glass-card max-w-md mx-auto">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-gray-800">
+            <Brain className="w-5 h-5 text-blue-600" />
+            Connect Google Gemini
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg">
+            <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+            <div className="text-sm text-blue-800">
+              <p className="font-medium mb-1">API Key Required</p>
+              <p>Get your free Gemini API key from Google AI Studio to enable AI-powered financial insights.</p>
+            </div>
+          </div>
+          <Input
+            type="password"
+            placeholder="Enter your Gemini API key"
+            value={geminiKey}
+            onChange={(e) => setGeminiKey(e.target.value)}
+            className="bg-white/60 border-gray-200"
+          />
+          <Button 
+            onClick={handleSaveApiKey}
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+            disabled={!geminiKey.trim()}
+          >
+            <Zap className="w-4 h-4 mr-2" />
+            Connect Gemini AI
+          </Button>
+          <p className="text-xs text-gray-500 text-center">
+            Your API key is stored locally and never shared
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[600px]">
       {/* Suggested Questions */}
       <div className="lg:col-span-1">
-        <Card className="card-gradient h-full">
+        <Card className="glass-card h-full">
           <CardHeader>
-            <CardTitle className="text-white text-sm">Try asking...</CardTitle>
+            <CardTitle className="text-gray-800 text-sm">Try asking...</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {suggestedQuestions.map((question, index) => (
@@ -130,29 +251,42 @@ export const ChatInterface = () => {
                 key={index}
                 variant="ghost"
                 size="sm"
-                className="w-full text-left justify-start h-auto p-3 hover:bg-primary/10 border border-primary/20"
+                className="w-full text-left justify-start h-auto p-3 hover:bg-blue-50 border border-blue-100"
                 onClick={() => handleSuggestedQuestion(question.text)}
               >
                 <div className="flex items-start gap-2">
-                  <question.icon className="w-4 h-4 text-primary mt-1 flex-shrink-0" />
+                  <question.icon className="w-4 h-4 text-blue-600 mt-1 flex-shrink-0" />
                   <div>
-                    <div className="text-xs text-primary mb-1">{question.category}</div>
-                    <div className="text-xs text-white text-left">{question.text}</div>
+                    <div className="text-xs text-blue-600 mb-1">{question.category}</div>
+                    <div className="text-xs text-gray-700 text-left">{question.text}</div>
                   </div>
                 </div>
               </Button>
             ))}
+            
+            <div className="pt-4 border-t border-gray-200">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setShowKeyInput(true)}
+              >
+                <Brain className="w-4 h-4 mr-2" />
+                Change API Key
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Chat Interface */}
       <div className="lg:col-span-3">
-        <Card className="card-gradient h-full flex flex-col">
+        <Card className="glass-card h-full flex flex-col">
           <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-primary" />
-              AI Financial Advisor
+            <CardTitle className="text-gray-800 flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-blue-600" />
+              Google Gemini AI Financial Advisor
+              <Badge className="bg-green-100 text-green-700 text-xs">Connected</Badge>
             </CardTitle>
           </CardHeader>
           
@@ -167,21 +301,21 @@ export const ChatInterface = () => {
                     <div className={`flex items-start gap-2 max-w-[80%] ${message.sender === 'user' ? 'flex-row-reverse' : ''}`}>
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                         message.sender === 'user' 
-                          ? 'bg-primary text-white' 
-                          : 'bg-secondary'
+                          ? 'bg-blue-600 text-white' 
+                          : 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
                       }`}>
-                        {message.sender === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+                        {message.sender === 'user' ? <User className="w-4 h-4" /> : <Brain className="w-4 h-4" />}
                       </div>
                       
                       <div className={`rounded-lg p-3 ${
                         message.sender === 'user'
-                          ? 'bg-primary text-white'
-                          : 'bg-secondary border border-primary/20'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white/80 border border-gray-200'
                       }`}>
-                        <p className="text-sm">{message.text}</p>
+                        <p className="text-sm whitespace-pre-wrap">{message.text}</p>
                         {message.type && message.sender === 'ai' && (
-                          <Badge className="mt-2 bg-primary/20 text-primary text-xs">
-                            {message.type}
+                          <Badge className="mt-2 bg-blue-100 text-blue-700 text-xs">
+                            Powered by Gemini
                           </Badge>
                         )}
                       </div>
@@ -192,14 +326,14 @@ export const ChatInterface = () => {
                 {isTyping && (
                   <div className="flex justify-start">
                     <div className="flex items-start gap-2">
-                      <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-                        <Bot className="w-4 h-4" />
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center">
+                        <Brain className="w-4 h-4 text-white" />
                       </div>
-                      <div className="bg-secondary border border-primary/20 rounded-lg p-3">
+                      <div className="bg-white/80 border border-gray-200 rounded-lg p-3">
                         <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                          <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                          <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                          <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
                         </div>
                       </div>
                     </div>
@@ -213,13 +347,13 @@ export const ChatInterface = () => {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder="Ask me about your finances..."
-                className="flex-1 bg-secondary border-primary/20"
+                className="flex-1 bg-white/60 border-gray-200"
                 onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
               />
               <Button 
                 onClick={handleSendMessage}
                 disabled={!inputValue.trim() || isTyping}
-                className="bg-primary hover:bg-primary/90"
+                className="bg-blue-600 hover:bg-blue-700"
               >
                 <Send className="w-4 h-4" />
               </Button>
