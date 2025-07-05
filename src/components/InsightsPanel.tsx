@@ -11,7 +11,8 @@ import {
   Lightbulb,
   Target,
   Calendar,
-  ArrowRight
+  ArrowRight,
+  Zap
 } from 'lucide-react';
 
 const insights = [
@@ -90,33 +91,50 @@ const trends = [
 
 export const InsightsPanel = () => {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="text-center space-y-4">
+        <h2 className="text-2xl font-bold text-gray-800">AI-Powered Financial Insights</h2>
+        <p className="text-muted-foreground">Personalized recommendations based on your financial data</p>
+      </div>
+
       {/* AI-Generated Insights */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {insights.map((insight) => (
-          <Card key={insight.id} className="card-gradient">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <insight.icon className={`w-5 h-5 ${insight.color}`} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {insights.map((insight, index) => (
+          <Card key={insight.id} className={`glass-card hover-lift slide-up slide-up-delay-${Math.min(index + 1, 3)}`}>
+            <CardContent className="p-8">
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                    insight.type === 'opportunity' ? 'bg-green-100' :
+                    insight.type === 'warning' ? 'bg-yellow-100' :
+                    insight.type === 'achievement' ? 'bg-blue-100' :
+                    'bg-purple-100'
+                  }`}>
+                    <insight.icon className={`w-6 h-6 ${insight.color}`} />
+                  </div>
                   <Badge 
                     variant={insight.type === 'warning' ? 'destructive' : 'secondary'}
-                    className="text-xs"
+                    className={`px-3 py-1 rounded-full ${
+                      insight.impact === 'High' ? 'bg-red-100 text-red-700' :
+                      insight.impact === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-green-100 text-green-700'
+                    }`}
                   >
                     {insight.impact} Impact
                   </Badge>
                 </div>
               </div>
               
-              <h3 className="text-white font-semibold mb-2">{insight.title}</h3>
-              <p className="text-muted-foreground text-sm mb-4">{insight.description}</p>
+              <h3 className="text-gray-800 font-semibold mb-3 text-lg">{insight.title}</h3>
+              <p className="text-muted-foreground mb-6 leading-relaxed">{insight.description}</p>
               
               <Button 
                 size="sm" 
-                className="bg-primary/20 text-primary hover:bg-primary hover:text-white"
+                className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl"
               >
                 {insight.action}
-                <ArrowRight className="w-3 h-3 ml-1" />
+                <ArrowRight className="w-3 h-3 ml-2" />
               </Button>
             </CardContent>
           </Card>
@@ -124,29 +142,34 @@ export const InsightsPanel = () => {
       </div>
 
       {/* Financial Health Trends */}
-      <Card className="card-gradient">
-        <CardHeader>
-          <CardTitle className="text-white">Financial Health Trends</CardTitle>
+      <Card className="glass-card hover-lift">
+        <CardHeader className="pb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-white" />
+            </div>
+            <CardTitle className="text-gray-800 text-xl">Financial Health Trends</CardTitle>
+          </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <CardContent className="px-8 pb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {trends.map((trend, index) => (
-              <div key={index} className="space-y-3">
+              <div key={index} className="space-y-4 p-4 bg-gray-50/50 rounded-2xl">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-white">{trend.metric}</span>
-                  <div className="flex items-center gap-1">
+                  <span className="text-sm font-semibold text-gray-800">{trend.metric}</span>
+                  <div className="flex items-center gap-2">
                     {trend.trend === 'up' ? (
-                      <TrendingUp className="w-4 h-4 text-green-400" />
+                      <TrendingUp className="w-4 h-4 text-green-600" />
                     ) : (
-                      <TrendingDown className="w-4 h-4 text-red-400" />
+                      <TrendingDown className="w-4 h-4 text-red-600" />
                     )}
-                    <span className={`text-sm ${trend.trend === 'up' ? 'text-green-400' : 'text-red-400'}`}>
+                    <span className={`text-sm font-bold ${trend.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
                       {trend.current}%
                     </span>
                   </div>
                 </div>
-                <Progress value={trend.current} className="h-2" />
-                <p className="text-xs text-muted-foreground">{trend.description}</p>
+                <Progress value={trend.current} className="h-3 bg-gray-200" />
+                <p className="text-xs text-muted-foreground leading-relaxed">{trend.description}</p>
               </div>
             ))}
           </div>
@@ -154,39 +177,42 @@ export const InsightsPanel = () => {
       </Card>
 
       {/* Scenario Planning */}
-      <Card className="card-gradient">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Target className="w-5 h-5 text-primary" />
-            Scenario Planning
-          </CardTitle>
+      <Card className="glass-card hover-lift">
+        <CardHeader className="pb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center">
+              <Target className="w-5 h-5 text-white" />
+            </div>
+            <CardTitle className="text-gray-800 text-xl">Scenario Planning</CardTitle>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-secondary/50 p-4 rounded-lg border border-primary/20">
-              <h4 className="text-white font-medium mb-2">Conservative Growth</h4>
-              <div className="text-2xl font-bold text-primary mb-1">₹42L</div>
-              <p className="text-xs text-muted-foreground">By age 40 with 8% returns</p>
+        <CardContent className="px-8 pb-8 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-2xl border border-green-100 hover-lift">
+              <h4 className="text-gray-800 font-semibold mb-3">Conservative Growth</h4>
+              <div className="text-3xl font-bold text-green-600 mb-2">₹42L</div>
+              <p className="text-sm text-muted-foreground">By age 40 with 8% returns</p>
             </div>
             
-            <div className="bg-secondary/50 p-4 rounded-lg border border-primary/20">
-              <h4 className="text-white font-medium mb-2">Current Trajectory</h4>
-              <div className="text-2xl font-bold text-primary mb-1">₹52L</div>
-              <p className="text-xs text-muted-foreground">By age 40 with 12% returns</p>
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100 hover-lift">
+              <h4 className="text-gray-800 font-semibold mb-3">Current Trajectory</h4>
+              <div className="text-3xl font-bold text-blue-600 mb-2">₹52L</div>
+              <p className="text-sm text-muted-foreground">By age 40 with 12% returns</p>
             </div>
             
-            <div className="bg-secondary/50 p-4 rounded-lg border border-primary/20">
-              <h4 className="text-white font-medium mb-2">Aggressive Growth</h4>
-              <div className="text-2xl font-bold text-primary mb-1">₹68L</div>
-              <p className="text-xs text-muted-foreground">By age 40 with 15% returns</p>
+            <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-2xl border border-purple-100 hover-lift">
+              <h4 className="text-gray-800 font-semibold mb-3">Aggressive Growth</h4>
+              <div className="text-3xl font-bold text-purple-600 mb-2">₹68L</div>
+              <p className="text-sm text-muted-foreground">By age 40 with 15% returns</p>
             </div>
           </div>
           
-          <div className="flex gap-2">
-            <Button size="sm" className="bg-primary/20 text-primary hover:bg-primary hover:text-white">
+          <div className="flex gap-4 justify-center">
+            <Button className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl">
+              <Zap className="w-4 h-4 mr-2" />
               Run Custom Scenario
             </Button>
-            <Button size="sm" variant="outline" className="border-primary/20 text-primary">
+            <Button variant="outline" className="border-2 border-blue-200 text-blue-600 hover:bg-blue-50 rounded-xl">
               Compare Options
             </Button>
           </div>
